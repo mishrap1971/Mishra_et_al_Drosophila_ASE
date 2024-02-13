@@ -1,0 +1,2 @@
+- "Genomic.read.count.F1" doesn't have X or Y genes
+- "combined" counts are simply the sum of an allele's counts in males and females [done for each gene]
