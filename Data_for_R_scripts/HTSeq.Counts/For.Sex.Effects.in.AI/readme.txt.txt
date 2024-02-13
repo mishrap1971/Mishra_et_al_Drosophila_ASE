@@ -1,0 +1,1 @@
+These are HTSeq-count outputs, which have been edited so that the same genes are reflected in all 6 (male + female) replicates for a given tissue. All genes have a minimum TOTAL expression of 30 reads (total = DGRP-177 + SP-159N reads). These files are the inputs for the AI tests (GLMs with quasibinomial distribution)
