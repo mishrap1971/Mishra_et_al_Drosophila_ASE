@@ -1,0 +1,10 @@
+1. CompMap.py will be run on two BAM files. Align the paired-end genomic reads to both GSRs with bwa-mem. Let's call the outputs "reads_aligned_to_DGRP177.bam" and "reads_aligned_to_SP159N.bam."
+
+2. Perform the following post-alignment processing with the two BAM files: adding read groups with coordinate-sorted reads, marking duplicates. (This is similar to the steps in "Variant_Calling_Workflow").
+
+3. After marking duplicate reads, need to sort the BAM files again - this time by read ID (called "queryname" in GATK's technical terms). Also, save the output as a SAM file instead of a BAM file (note: this will take up a lot of space)
+
+4. Now make a list of read IDs that are common to "reads_aligned_to_DGRP177_post_processing.sam" and
+"reads_aligned_to_SP159N_post_processing.sam" using awk. Save this read list as "common_reads_list.txt"
+
+5. You can now run CompMap, using the two SAM files mentioned above as inputs, along with "common_reads_list.txt". Look at the CompMap.py script for more specific instructions.

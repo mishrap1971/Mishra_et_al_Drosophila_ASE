@@ -1,0 +1,45 @@
+1. Genotype-specific references (s) are made by incorporating variants specific to the genotype into the standard D. melanogaster reference. So to make GSRs, one first needs to call variants for the population in concern. The workflow for calling variants has been described in "snp_calling_pipeline.sh." Once the pipeline has been executed, we'll have VCF files for the two parental genotypes: DGRP177 and SP159N. Let's call the VCFs DGRP177.vcf and SP159N.vcf.
+
+2. Separate the above two VCFs into VCFs for indels and SNPs: DGRP177_SNPs.vcf, DGRP177_indels.vcf, SP159N_SNPs.vcf, SP159N_indels.vcf. They ought to have the same header lengths
+
+gatk SplitVcfs -I DGRP177.vcf -SNP_OUTPUT DGRP177_SNPs.vcf -INDEL_OUTPUT DGRP177_indels.vcf
+
+3. Filter out any multiallelic variant calls. Multi-allelic calls are usually based on a sequencing or alignment error, and do not truly reflect the presence of multiple variants at a site.
+
+#figure out header length of VCF files by typing out a command like this. Once it has run, scroll down to the line where the header ends and note down the line number
+less -S -N DGRP177_SNPs.vcf   [let's say the header was 675 lines long]
+
+#remove header from consideration, and then filter out lines which feature multi-allelic SNP/indel calls. Since those alternate calls mean column #5 will be of length >1, you can use pattern searching to find those lines out
+sed '1,675d' DGRP177_SNPs.vcf | awk -F'\t' 'length($5) == 1' > DGRP177_SNPs_only_biallelic_sites.vcf
+
+4. Some of the SNP calls are heterozygous or plain uninformative; we don't want to incorporate these into the GSRs - only the homozygous SNP calls. We'll need to mask the sites corresponding to heterozygous SNP calls (with the reference showing an 'N' at the site instead of A/T/G/C), so that these sites have zero role to play in read alignment. To extract lines from a VCF that correspond to these suspicious sites, look mainly for the following values in the GT (genotype) info field: 0|0, 0/0, 1/0, 0/1. There may be other odd values for genotype, like "5/0" or "2|2". We need to extract those as well. Use a sed/awk command to extract out ALL the lines that are NOT the homozygous SNP calls, i.e., the ones that have a value of "1|1" or "1/1" for GT. Once that is done, save that as a header-less VCF file (e.g., "DGRP177_heterozgyous_SNPs.vcf")
+
+5. Using the VCFs with biallelic SNPs ("DGRP177_SNPs_only_biallelic_sites.vcf"), extract rows where:
+   a) minor allele frequency < 95% (search for "AF" in the VCF)
+   b) depth of coverage < 10 (search for the field "DP")  
+
+After these rows have been extracted, save them as a header-less VCF file (e.g., "DGRP177_low_conf_SNPs.vcf")
+
+6. All the sites in steps 4-5 need to masked in the GSRs, because we are not reasonably confident that those SNPs can be trusted. For now, we make a "VCF mask" to be used in the final steps. This VCF mask is essentially VCF from step 6 + VCF from step 5 + the header (from any of the previous VCFs with a header) concatenated on top. We need to make a common VCF mask for making both GSRs - so we'll have to run the steps for "DGRP177" and "SP159N", then concatenate all of those together with a VCF header. Save this concatenated jumble of a VCF as "DGRP177_and_SP159N_SNP_mask.vcf". Note that all these steps can be done using "cat" in Linux.
+
+
+7. We need to mask ALL the indels, because incorporating indels into a GSR would be really disruptive for alignment. To make an indel "mask", make a BED file using "DGRP177_indels.vcf" as input in. The BED file should have the following start and end coordinates, based on the indel length:
+   a) 10 bp around indels of length < 6 bp, 
+   b) 20 bp around indels of greatear than 6 bp but less than 12 bp, 
+   c) 100 bps around indels of length > 12 bp. 
+
+All these coordinates can be obtained using awk and made into a BED file. Note that the BED file should have three columns as usual, so specify "Indel_name", "Start" and "Stop". "Indel_name" could just contain the Chromosome and Start Coordinate separated by a colon (e.g., "2L:76123"). Repeat the steps with "SP159N_indels.vcf" as well. Let's name the two BED files "DGRP177_indels.bed" and "SP159N_indels.bed". Now concatenate the two BED files into one "DGRP177_and_SP159N_Indels.bed".
+
+8. We can now move to making the GSRs, using GATK FastaAlternateReferenceMaker:
+gatk FastaAlternateReferenceMaker --reference Drosophila_melanogaster.BDGP6.28.dna.toplevel.fa -output DGRP177_Specific_Ref_No_Indels_Masked.fa --variant DGRP177_SNPs_only_biallelic_sites.vcf
+--snp-mask DGRP177_and_SP159N_SNP_mask.vcf 
+
+10. The final masking steps still remain. Note that we have not masked the positions around indels yet. To do that, use the tool "maskfasta" from BedTools:
+bedtools maskfasta -fi DGRP177_Specific_Ref_No_Indels_Masked.fa -bed Ma_and_SP159N_Indels.bed -fo DGRP177_specific_ref.fa
+bedtools maskfasta -fi SP159N_Specific_Ref_No_Indels_Masked.fa -bed Ma_and_SP159N_Indels.bed -fo SP159N_specific_ref.fa
+
+11. The masking steps are done, and the output FASTA (.fa) files are ready to be used as GSRs
+
+
+
+ 
